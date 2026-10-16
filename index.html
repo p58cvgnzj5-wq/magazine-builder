@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Magazine Builder</title>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0 }
+  html, body { height:100% }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background:#1a1a2e; color:#e0e0e0; overflow:hidden; height:100vh; height:100dvh;
+    display:flex; flex-direction:column;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button, label, select, input, .template, .gallery-item, .thumb, .bgopt, .swatch { touch-action:manipulation }
+  button { font-family:inherit }
+  button:disabled { opacity:.4 }
+
+  /* HEADER */
+  #header {
+    display:flex; align-items:center; gap:8px; padding:6px 12px;
+    background:#16213e; border-bottom:1px solid #0f3460; min-height:56px; flex-shrink:0;
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
+  }
+  #header h1 { font-size:18px; font-weight:700; color:#e94560; white-space:nowrap }
+  .spacer { flex:1; min-width:4px }
+  #header button, #footer button, #sel-toolbar button, #strip button, .side-btn {
+    min-height:44px; min-width:44px; padding:6px 12px; border:none; border-radius:6px; cursor:pointer;
+    font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0;
+  }
+  .btn-page { background:#0f3460; color:#e0e0e0 }
+  .btn-page:hover { background:#1a4a7a }
+  .btn-export { background:#e94560; color:#fff }
+  .btn-export:hover { background:#c73650 }
+  #page-indicator { font-size:13px; color:#aaa; min-width:80px; text-align:center; white-space:nowrap }
+  #sidebar-toggle { display:none }
+
+  /* MAIN */
+  #main { display:flex; flex:1; overflow:hidden; position:relative; min-height:0 }
+
+  /* SIDEBAR */
+  #sidebar {
+    width:270px; flex-shrink:0; background:#16213e; border-right:1px solid #0f3460;
+    display:flex; flex-direction:column; overflow-y:auto; padding:12px; -webkit-overflow-scrolling:touch;
+  }
+  #sidebar h3 { font-size:13px; text-transform:uppercase; letter-spacing:1px; color:#999; margin:18px 0 8px }
+  #sidebar h3:first-child { margin-top:0 }
+  #upload-zone {
+    display:block; border:2px dashed #0f3460; border-radius:10px; padding:20px 12px; min-height:60px;
+    text-align:center; cursor:pointer; color:#888; font-size:13px; margin-bottom:8px;
+  }
+  #upload-zone:hover, #upload-zone.dragover { border-color:#e94560; color:#e94560 }
+  #file-input { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; pointer-events:none }
+  #gallery { display:grid; grid-template-columns:repeat(2,1fr); gap:8px }
+  .gallery-item {
+    aspect-ratio:1; border-radius:6px; overflow:hidden; cursor:grab; border:2px solid transparent;
+    background:#0f3460; position:relative; touch-action:pan-y;
+  }
+  .gallery-item:hover { border-color:#e94560 }
+  .gallery-item img { width:100%; height:100%; object-fit:cover; pointer-events:none; -webkit-user-drag:none }
+  .gallery-item .remove {
+    position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%;
+    background:rgba(0,0,0,.7); color:#fff; border:none; cursor:pointer; font-size:14px; line-height:22px; display:none;
+  }
+  .gallery-item:hover .remove { display:block }
+  .side-row { display:flex; flex-wrap:wrap; gap:6px }
+  .side-btn { flex:1; background:#0f3460; color:#e0e0e0 }
+  .swatch { width:36px; height:36px; border-radius:6px; border:2px solid #0f3460; cursor:pointer }
+  .swatch.on { border-color:#e94560 }
+  #bg-color { width:44px; height:36px; border:none; background:none }
+  #bg-picker { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:8px }
+  .bgopt { aspect-ratio:1; border-radius:4px; border:2px solid #0f3460; overflow:hidden; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:11px; color:#888; background:#0a0a1a }
+  .bgopt.on { border-color:#e94560 }
+  .bgopt img { width:100%; height:100%; object-fit:cover; pointer-events:none }
+  #drag-ghost { position:fixed; width:90px; height:90px; pointer-events:none; z-index:1000; display:none;
+    border-radius:8px; overflow:hidden; opacity:.8; box-shadow:0 6px 20px rgba(0,0,0,.5);
+    border:2px solid #e94560; transform:translate(-50%,-50%) }
+  #drag-ghost img { width:100%; height:100%; object-fit:cover }
+  #templates { display:grid; grid-template-columns:repeat(3,1fr); gap:6px }
+  .template { aspect-ratio:3/4; border-radius:4px; cursor:pointer; border:2px solid #0f3460;
+    display:flex; align-items:center; justify-content:center; font-size:10px; color:#888;
+    background:#0a0a1a; position:relative; overflow:hidden }
+  .template:hover { border-color:#e94560 }
+  .template .t-line { position:absolute; background:#e94560; opacity:.3; border-radius:1px }
+  .template .t-text { position:absolute; background:#fff; opacity:.6; border-radius:1px }
+  .template-name { position:relative; z-index:1; background:rgba(0,0,0,.8); padding:2px 4px; border-radius:3px }
+
+  /* SOURCES / GOOGLE PHOTOS */
+  .src-btns { display:flex; flex-direction:column; gap:8px; margin-bottom:8px }
+  .src-btn { display:flex; align-items:center; justify-content:center; gap:8px; min-height:56px; padding:10px 12px;
+    border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; border:2px solid #0f3460; text-align:center }
+  #upload-zone.src-btn { background:#0f3460; color:#fff; border-style:dashed; margin:0 }
+  #upload-zone.src-btn:hover, #upload-zone.dragover { border-color:#e94560; color:#fff }
+  #gp-btn { background:#fff; color:#1f1f1f; border-color:#fff; font-family:inherit }
+  #gp-btn:disabled { background:#3a3f55; color:#999; border-color:#3a3f55; cursor:not-allowed; opacity:1 }
+  .gp-note { font-size:11px; color:#999; line-height:1.4 }
+  #gp-panel { position:fixed; inset:0; z-index:2000; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:20px }
+  #gp-panel.show { display:flex }
+  #gp-box { background:#16213e; border:1px solid #0f3460; border-radius:14px; padding:20px; width:min(420px,100%); box-shadow:0 10px 40px rgba(0,0,0,.6) }
+  #gp-box h4 { font-size:17px; margin-bottom:10px; color:#fff }
+  #gp-msg { font-size:14px; color:#ccc; line-height:1.45; margin-bottom:12px; white-space:pre-line }
+  #gp-msg.err { color:#ff9aa8 }
+  #gp-bar { height:8px; border-radius:4px; background:#0f3460; overflow:hidden; margin-bottom:14px; display:none }
+  #gp-bar div { height:100%; width:0; background:#e94560; transition:width .2s }
+  #gp-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end }
+  #gp-actions button, #gp-actions a { min-height:44px; padding:8px 14px; border-radius:8px; border:none; font-size:14px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center }
+  .gp-primary { background:#e94560; color:#fff } .gp-secondary { background:#0f3460; color:#e0e0e0 }
+
+  /* CANVAS */
+  #canvas-wrapper { flex:1; overflow:auto; display:flex; background:#111827; padding:24px; position:relative; min-width:0; -webkit-overflow-scrolling:touch }
+  #canvas-container { position:relative; box-shadow:0 4px 40px rgba(0,0,0,.6); margin:auto; flex-shrink:0 }
+  #canvas { position:absolute; left:0; top:0; transform-origin:0 0; touch-action:none; --z:1; --hs:12px }
+  #grid-ov { position:absolute; inset:0; pointer-events:none; z-index:60; display:none;
+    background-image:linear-gradient(rgba(0,0,0,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.06) 1px,transparent 1px);
+    background-size:20px 20px }
+  #canvas.show-grid #grid-ov { display:block }
+  #drop-hint { position:absolute; inset:16px; border:2px dashed #e94560; border-radius:8px; pointer-events:none; display:none;
+    align-items:center; justify-content:center; z-index:100; color:#e94560; font-size:18px; font-weight:600; background:rgba(233,69,96,.05) }
+  #canvas-container.drag-over #drop-hint { display:flex }
+
+  /* PAGE RENDERING (shared by canvas, thumbnails, print) */
+  .pg { position:relative; width:595px; height:842px; overflow:hidden; background:#fff }
+  .pg .bgimg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block }
+  .el { position:absolute }
+  .el .clip { width:100%; height:100%; overflow:hidden; background:#eee }
+  .el .clip img { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; -webkit-user-drag:none }
+  .el .txt { width:100%; height:100%; overflow:hidden; white-space:pre-wrap; overflow-wrap:break-word; line-height:1.15; padding:4px; outline:none }
+
+  /* EDITING UI */
+  #canvas .el { cursor:move; touch-action:none }
+  #canvas .el.selected { outline:calc(3px / var(--z)) solid #e94560; z-index:40 }
+  #canvas .el.cropping { outline:calc(3px / var(--z)) dashed #ffb020 }
+  #canvas .el.editing { cursor:text; touch-action:auto }
+  #canvas .el.editing .txt { user-select:text; -webkit-user-select:text; outline:calc(1px / var(--z)) dashed #e94560 }
+  .handle { position:absolute; width:calc(var(--hs) / var(--z)); height:calc(var(--hs) / var(--z)); z-index:45; touch-action:none }
+  .handle::after { content:''; position:absolute; inset:15%; background:#e94560; border:calc(2px / var(--z)) solid #fff; border-radius:2px }
+  .h-nw { top:calc(var(--hs) / var(--z) / -2); left:calc(var(--hs) / var(--z) / -2); cursor:nw-resize }
+  .h-n  { top:calc(var(--hs) / var(--z) / -2); left:calc(50% - var(--hs) / var(--z) / 2); cursor:n-resize }
+  .h-ne { top:calc(var(--hs) / var(--z) / -2); right:calc(var(--hs) / var(--z) / -2); cursor:ne-resize }
+  .h-e  { top:calc(50% - var(--hs) / var(--z) / 2); right:calc(var(--hs) / var(--z) / -2); cursor:e-resize }
+  .h-se { bottom:calc(var(--hs) / var(--z) / -2); right:calc(var(--hs) / var(--z) / -2); cursor:se-resize }
+  .h-s  { bottom:calc(var(--hs) / var(--z) / -2); left:calc(50% - var(--hs) / var(--z) / 2); cursor:s-resize }
+  .h-sw { bottom:calc(var(--hs) / var(--z) / -2); left:calc(var(--hs) / var(--z) / -2); cursor:sw-resize }
+  .h-w  { top:calc(50% - var(--hs) / var(--z) / 2); left:calc(var(--hs) / var(--z) / -2); cursor:w-resize }
+  .rot { position:absolute; z-index:45; touch-action:none; cursor:grab; border-radius:50%;
+    width:calc(var(--hs) / var(--z) + 8px / var(--z)); height:calc(var(--hs) / var(--z) + 8px / var(--z));
+    left:calc(50% - (var(--hs) + 8px) / var(--z) / 2); top:calc(-48px / var(--z));
+    background:#fff; border:calc(3px / var(--z)) solid #e94560 }
+  .del-btn { position:absolute; z-index:46; left:calc(-6px / var(--z)); top:calc(-48px / var(--z));
+    width:calc(32px / var(--z)); height:calc(32px / var(--z)); border-radius:50%; padding:0;
+    background:#e94560; color:#fff; border:none; font-size:calc(18px / var(--z)); line-height:1; cursor:pointer }
+  .ui-below .rot { top:auto; bottom:calc(-48px / var(--z)) }
+  .ui-below .del-btn { top:auto; bottom:calc(-48px / var(--z)) }
+  .cropping .handle, .cropping .rot { display:none }
+
+  /* SELECTION TOOLBAR */
+  #sel-toolbar { position:absolute; left:50%; bottom:10px; transform:translateX(-50%); z-index:200;
+    display:none; flex-direction:column; gap:6px; padding:6px; background:rgba(22,33,62,.97); border:1px solid #0f3460;
+    border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.5); max-width:calc(100% - 16px) }
+  #sel-toolbar.show { display:flex }
+  .tb-row { display:flex; gap:6px; align-items:center; overflow-x:auto; -webkit-overflow-scrolling:touch }
+  #sel-toolbar button { background:#0f3460; color:#e0e0e0; padding:6px 10px }
+  #sel-toolbar button.on { background:#e94560; color:#fff }
+  #sel-toolbar .del { background:#e94560; color:#fff }
+  .tb-lbl { display:flex; align-items:center; gap:4px; font-size:13px; color:#aaa; min-height:44px; white-space:nowrap; flex-shrink:0 }
+  .tb-lbl input[type=range] { width:110px }
+  #sel-toolbar select, #sel-toolbar input[type=number] { min-height:44px; background:#0f3460; color:#e0e0e0; border:none; border-radius:6px; padding:0 8px; font-size:14px; flex-shrink:0 }
+  #sel-toolbar input[type=number] { width:64px }
+  #sel-toolbar input[type=color] { width:40px; height:36px; border:none; background:none; flex-shrink:0 }
+  .text-only, .img-only, .crop-only { display:none !important }
+  #sel-toolbar.is-text .text-only { display:flex !important }
+  #sel-toolbar.is-img .img-only { display:flex !important }
+  #sel-toolbar.cropping .crop-only { display:flex !important }
+  #sel-toolbar.cropping .nocrop { display:none !important }
+
+  /* PAGE STRIP */
+  #strip { display:flex; align-items:center; gap:8px; padding:6px 12px; background:#131c35; border-top:1px solid #0f3460; flex-shrink:0; height:104px }
+  #strip-pages { display:flex; gap:8px; overflow-x:auto; flex:1; align-items:center; height:100%; -webkit-overflow-scrolling:touch; padding:2px }
+  .thumb { width:64px; height:91px; position:relative; flex-shrink:0; overflow:hidden; border:2px solid #0f3460; border-radius:4px; cursor:pointer; touch-action:pan-x; background:#fff }
+  .thumb.active { border-color:#e94560 }
+  .thumb.dragging { z-index:10; opacity:.85; box-shadow:0 6px 20px rgba(0,0,0,.6); transition:none }
+  .thumb .thumb-scale { transform:scale(0.1008); transform-origin:0 0; pointer-events:none }
+  .thumb .num { position:absolute; right:2px; bottom:2px; font-size:10px; background:rgba(0,0,0,.7); color:#fff; padding:0 4px; border-radius:3px }
+
+  /* FOOTER */
+  #footer { display:flex; align-items:center; gap:12px; padding:4px 12px; background:#16213e; border-top:1px solid #0f3460;
+    min-height:48px; flex-shrink:0; font-size:13px; color:#888; overflow-x:auto; white-space:nowrap }
+  #footer label { display:flex; align-items:center; gap:6px; cursor:pointer; min-height:44px }
+  #footer input[type=range] { width:110px }
+  #footer input[type=checkbox] { accent-color:#e94560; width:20px; height:20px }
+  .snap-label { color:#e94560 }
+  #save-status { color:#6c9 }
+
+  @media (pointer:coarse) {
+    #canvas { --hs:28px }
+    .gallery-item .remove { display:block; width:28px; height:28px; line-height:28px; font-size:18px }
+  }
+  @media (max-width:900px), (orientation:portrait) {
+    #sidebar-toggle { display:inline-block }
+    #sidebar { position:absolute; top:0; bottom:0; left:0; z-index:300; width:min(290px,85vw);
+      transform:translateX(-100%); transition:transform .2s; box-shadow:4px 0 20px rgba(0,0,0,.5) }
+    body.sidebar-open #sidebar { transform:none }
+  }
+  @media (max-width:600px) { #header h1 { font-size:15px } }
+
+  /* PRINT */
+  #print-root { display:none }
+  @page { size:595px 842px; margin:0 }
+  @media print {
+    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important }
+    html, body { height:auto !important; overflow:visible !important; background:#fff !important; padding:0 !important; display:block !important }
+    body > *:not(#print-root) { display:none !important }
+    #print-root { display:block !important }
+    .print-page { width:595px; height:842px; overflow:hidden; break-after:page; page-break-after:always }
+    .print-page:last-child { break-after:auto; page-break-after:auto }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <button id="sidebar-toggle" class="btn-page" onclick="toggleSidebar()">☰ Tools</button>
+  <h1>📰 Magazine Builder</h1>
+  <span class="spacer"></span>
+  <button id="undo-btn" class="btn-page" onclick="undo()" aria-label="Undo">↶ Undo</button>
+  <button id="redo-btn" class="btn-page" onclick="redo()" aria-label="Redo">↷ Redo</button>
+  <button class="btn-page" onclick="prevPage()" aria-label="Previous page">◀</button>
+  <span id="page-indicator">Page 1 / 1</span>
+  <button class="btn-page" onclick="nextPage()" aria-label="Next page">▶</button>
+  <button class="btn-page" onclick="addPage()">+ Page</button>
+  <button class="btn-page" onclick="duplicatePage()">⧉ Dup page</button>
+  <button class="btn-page" onclick="deletePage()">🗑 Page</button>
+  <button class="btn-page" onclick="clearPage()">Clear</button>
+  <button class="btn-export" onclick="exportPage()">📥 Export</button>
+  <button class="btn-export" onclick="exportAll()">📚 Export all</button>
+  <button class="btn-page" onclick="newMagazine()">✦ New magazine</button>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <h3>📷 Your Images</h3>
+    <div class="src-btns">
+      <label id="upload-zone" class="src-btn" for="file-input">📷 Photos / Files / Drive</label>
+      <button id="gp-btn" class="src-btn" onclick="googlePhotosStart()">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="#EA4335" d="M12 2a5 5 0 0 1 5 5v5H12z"/><path fill="#FBBC05" d="M22 12a5 5 0 0 1-5 5h-5v-5z"/><path fill="#34A853" d="M12 22a5 5 0 0 1-5-5v-5h5z"/><path fill="#4285F4" d="M2 12a5 5 0 0 1 5-5h5v5z"/></svg>
+        Google Photos</button>
+      <div id="gp-note" class="gp-note"></div>
+    </div>
+    <input type="file" id="file-input" multiple accept="image/*" onchange="handleUpload(event)">
+    <div id="gallery"></div>
+
+    <h3>🔤 Text</h3>
+    <div class="side-row">
+      <button class="side-btn" onclick="addText('headline')">Headline</button>
+      <button class="side-btn" onclick="addText('caption')">Caption</button>
+      <button class="side-btn" onclick="addText('body')">Body</button>
+    </div>
+
+    <h3>🎨 Page Background</h3>
+    <div class="side-row" id="bg-swatches"></div>
+    <div id="bg-picker"></div>
+
+    <h3>📐 Layout Templates</h3>
+    <div id="templates"></div>
+  </div>
+
+  <div id="canvas-wrapper">
+    <div id="canvas-container">
+      <div id="canvas" class="pg"></div>
+      <div id="drop-hint">Drop image here</div>
+    </div>
+  </div>
+
+  <div id="sel-toolbar">
+    <div class="tb-row">
+      <button class="del" onclick="deleteSel()" aria-label="Delete">🗑 Delete</button>
+      <span class="nocrop" style="display:flex;gap:6px">
+        <button onclick="nudge(-1,0)" aria-label="Nudge left">←</button>
+        <button onclick="nudge(0,-1)" aria-label="Nudge up">↑</button>
+        <button onclick="nudge(0,1)" aria-label="Nudge down">↓</button>
+        <button onclick="nudge(1,0)" aria-label="Nudge right">→</button>
+        <button onclick="bringToFront()">⬆ Front</button>
+        <button onclick="sendToBack()">⬇ Back</button>
+        <button onclick="duplicateEl()" aria-label="Duplicate">⧉</button>
+        <label class="tb-lbl">⟳ <input type="range" id="tb-rot" min="-180" max="180" step="1"> <span id="tb-rot-val">0°</span></label>
+      </span>
+      <button id="tb-crop" class="img-only" onclick="toggleCrop()">✂ Crop</button>
+      <label class="tb-lbl crop-only">Zoom <input type="range" id="tb-cropzoom" min="100" max="500" step="1"></label>
+      <button class="crop-only" onclick="resetCrop()">Reset</button>
+    </div>
+    <div class="tb-row text-only">
+      <button onclick="enterEdit(sel)">✎ Edit</button>
+      <select id="tb-font" aria-label="Font"></select>
+      <input type="number" id="tb-size" min="6" max="300" aria-label="Font size">
+      <button id="tb-bold" onclick="toggleProp('bold')" aria-label="Bold"><b>B</b></button>
+      <button id="tb-italic" onclick="toggleProp('italic')" aria-label="Italic"><i>I</i></button>
+      <button data-align="left" onclick="setAlign('left')">⇤</button>
+      <button data-align="center" onclick="setAlign('center')">↔</button>
+      <button data-align="right" onclick="setAlign('right')">⇥</button>
+      <button data-align="justify" onclick="setAlign('justify')">☰</button>
+      <label class="tb-lbl">Color <input type="color" id="tb-color"></label>
+      <label class="tb-lbl"><input type="checkbox" id="tb-bgon"> Bg</label>
+      <input type="color" id="tb-bg" value="#ffffff" aria-label="Background color">
+    </div>
+  </div>
+</div>
+
+<div id="strip">
+  <div id="strip-pages"></div>
+  <button class="btn-page" onclick="addPage()" aria-label="Add page">+</button>
+  <button class="btn-page" onclick="duplicatePage()">⧉ Dup</button>
+</div>
+
+<div id="footer">
+  <label><input type="checkbox" id="grid-toggle" onchange="toggleGrid()" checked> Grid</label>
+  <label><input type="checkbox" id="snap-toggle" onchange="toggleSnap()" checked> <span class="snap-label">Snap</span></label>
+  <span>Zoom:</span>
+  <input type="range" id="zoom-slider" min="20" max="150" value="85" oninput="setZoom(this.value)">
+  <span id="zoom-val">85%</span>
+  <button class="btn-page" onclick="fitZoom()">Fit</button>
+  <span class="spacer"></span>
+  <span id="info-bar">No element selected</span>
+  <span id="save-status"></span>
+</div>
+
+<div id="drag-ghost"><img alt=""></div>
+<div id="print-root"></div>
+<div id="gp-panel" role="dialog" aria-modal="true" aria-labelledby="gp-title">
+  <div id="gp-box">
+    <h4 id="gp-title">Google Photos</h4>
+    <div id="gp-msg"></div>
+    <div id="gp-bar"><div></div></div>
+    <div id="gp-actions"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// GOOGLE PHOTOS SETUP — paste your OAuth 2.0 Web client ID here.
+// (Google Cloud Console → APIs & Services → Credentials → OAuth client ID,
+//  type "Web application"; enable the "Google Photos Picker API";
+//  add this site's https origin under "Authorized JavaScript origins".)
+// Leave empty to disable the Google Photos button.
+const GOOGLE_CLIENT_ID = '';
+// ════════════════════════════════════════════════════════════════════
+
+// ───────── CONSTANTS ─────────
+const PAGEW = 595, PAGEH = 842, GRID = 20, HIST_CAP = 50;
+const FONTS = {
+  display:   { label:'Serif display', css:'Didot, "Bodoni 72", "Bodoni MT", "Playfair Display", Georgia, serif' },
+  serif:     { label:'Serif',         css:'Georgia, "Times New Roman", Times, serif' },
+  sans:      { label:'Sans',          css:'-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif' },
+  condensed: { label:'Condensed',     css:'"Avenir Next Condensed", "Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif', stretch:'condensed' },
+  script:    { label:'Script',        css:'"Snell Roundhand", "Apple Chancery", "Brush Script MT", "Segoe Script", cursive' },
+};
+const TEXT_DEFAULTS = {
+  headline: { text:'Headline', font:'display', size:48, bold:true,  italic:false, align:'left', color:'#111111', bg:null, w:440, h:80 },
+  caption:  { text:'Caption text', font:'sans', size:13, bold:false, italic:true, align:'left', color:'#333333', bg:null, w:260, h:40 },
+  body:     { text:'Body text. Tap to edit…', font:'serif', size:15, bold:false, italic:false, align:'left', color:'#222222', bg:null, w:300, h:180 },
+};
+const BG_PRESETS = ['#ffffff','#f5f0e6','#111111','#16213e','#e94560','#a3b18a'];
+
+// ───────── STATE ─────────
+let pages = [newPage()], cur = 0;
+let galleryIds = [];           // order of gallery
+let images = {};               // id -> {src,name,w,h}  (not in undo history; referenced by id)
+let settings = { grid:true, snap:true };
+let zoom = 0.85, sel = null, cropMode = false, editing = null;
+let hist = [], hIdx = -1;
+
+function newPage() { return { bg:'#ffffff', bgImg:null, els:[] }; }
+function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+const page = () => pages[cur];
+const findEl = id => page().els.find(e => e.id === id);
+const selEl = () => sel ? findEl(sel) : null;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = v => Math.round(v / GRID) * GRID;
+const normAng = a => { a = ((a + 180) % 360 + 360) % 360 - 180; return Math.round(a * 10) / 10; };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+
+const $ = id => document.getElementById(id);
+const canvas = $('canvas'), canvasContainer = $('canvas-container'), canvasWrapper = $('canvas-wrapper');
+const gallery = $('gallery'), templatesEl = $('templates'), tb = $('sel-toolbar');
+const ghost = $('drag-ghost'), printRoot = $('print-root'), stripPages = $('strip-pages');
+const infoBar = $('info-bar');
+
+// ───────── RENDERING (shared by canvas / thumbs / print) ─────────
+function elStyle(e) {
+  let s = `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;transform:rotate(${e.rot || 0}deg);`;
+  if (e.type === 'text' && e.bg) s += `background:${e.bg};`;
+  return s;
+}
+function imgStyle(e) {
+  const c = e.crop || { px:50, py:50, s:1 };
+  return `object-position:${c.px}% ${c.py}%;transform:scale(${c.s});transform-origin:${c.px}% ${c.py}%;`;
+}
+function txtStyle(e) {
+  const f = FONTS[e.font] || FONTS.sans;
+  return `font-family:${f.css.replace(/"/g, "'")};font-stretch:${f.stretch || 'normal'};font-size:${e.size}px;` +
+    `font-weight:${e.bold ? 700 : 400};font-style:${e.italic ? 'italic' : 'normal'};text-align:${e.align};color:${e.color};`;
+}
+function elHTML(e) {
+  if (e.type === 'image') {
+    const src = images[e.imgId] ? images[e.imgId].src : '';
+    return `<div class="el el-img" data-id="${e.id}" style="${elStyle(e)}"><div class="clip"><img src="${src}" alt="" draggable="false" style="${imgStyle(e)}"></div></div>`;
+  }
+  return `<div class="el el-txt" data-id="${e.id}" style="${elStyle(e)}"><div class="txt" style="${txtStyle(e)}">${esc(e.text)}</div></div>`;
+}
+function bgHTML(p) { const im = p.bgImg && images[p.bgImg]; return im ? `<img class="bgimg" src="${im.src}" alt="">` : ''; }
+function pageHTML(p) { return `<div class="pg" style="background:${p.bg}">${bgHTML(p)}${p.els.map(elHTML).join('')}</div>`; }
+
+function renderCanvas() {
+  const p = page();
+  canvas.style.background = p.bg;
+  canvas.innerHTML = bgHTML(p) + p.els.map(elHTML).join('') + '<div id="grid-ov"></div>';
+  canvas.classList.toggle('show-grid', settings.grid);
+  if (editing) editing = null;
+  decorate();
+}
+function nodeOf(id) { return canvas.querySelector(`.el[data-id="${id}"]`); }
+function updateNode(e) {
+  const n = nodeOf(e.id); if (!n) return;
+  n.style.cssText = elStyle(e);
+  if (e.type === 'image') n.querySelector('img').style.cssText = imgStyle(e);
+  else n.querySelector('.txt').style.cssText = txtStyle(e);
+}
+function decorate() {
+  canvas.querySelectorAll('.ui').forEach(x => x.remove());
+  canvas.querySelectorAll('.el.selected').forEach(n => n.classList.remove('selected', 'cropping', 'ui-below'));
+  const e = selEl();
+  if (!e) { sel = null; cropMode = false; return; }
+  const n = nodeOf(e.id); if (!n) return;
+  n.classList.add('selected');
+  n.classList.toggle('cropping', cropMode);
+  n.classList.toggle('ui-below', e.y < 56 / zoom);
+  n.insertAdjacentHTML('beforeend',
+    ['nw','n','ne','e','se','s','sw','w'].map(d => `<div class="ui handle h-${d}" data-dir="${d}"></div>`).join('') +
+    '<div class="ui rot" title="Rotate"></div><button class="ui del-btn" aria-label="Delete">×</button>');
+}
+
+function renderAll() {
+  if (cur >= pages.length) cur = pages.length - 1;
+  renderCanvas(); renderGallery(); renderBgControls();
+  updatePageIndicator(); updateToolbar(); updateInfo(); renderStrip(); updateUndoBtns();
+}
+
+// ───────── ZOOM ─────────
+function setZoom(v) {
+  v = Math.round(v); zoom = v / 100;
+  $('zoom-slider').value = v; $('zoom-val').textContent = v + '%';
+  canvasContainer.style.width = PAGEW * zoom + 'px';
+  canvasContainer.style.height = PAGEH * zoom + 'px';
+  canvas.style.transform = `scale(${zoom})`;
+  canvas.style.setProperty('--z', zoom);
+  decorate();
+}
+function fitZoom() {
+  const cs = getComputedStyle(canvasWrapper);
+  const aw = canvasWrapper.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const ah = canvasWrapper.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  setZoom(clamp(Math.floor(Math.min(aw / PAGEW, ah / PAGEH) * 100), 20, 150));
+}
+
+// ───────── SIDEBAR ─────────
+function toggleSidebar(force) {
+  const open = typeof force === 'boolean' ? force : !document.body.classList.contains('sidebar-open');
+  document.body.classList.toggle('sidebar-open', open);
+}
+function sidebarIsOverlay() { return getComputedStyle($('sidebar-toggle')).display !== 'none'; }
+function closeOverlay() { if (sidebarIsOverlay()) toggleSidebar(false); }
+
+function toggleGrid() { settings.grid = $('grid-toggle').checked; canvas.classList.toggle('show-grid', settings.grid); scheduleSave(); }
+function toggleSnap() { settings.snap = $('snap-toggle').checked; scheduleSave(); }
+
+// ───────── HISTORY ─────────
+function snap() { return JSON.stringify({ pages, cur, galleryIds }); }
+function resetHistory() { hist = [snap()]; hIdx = 0; updateUndoBtns(); }
+function commit() {
+  const s = snap();
+  if (s === hist[hIdx]) return;
+  hist = hist.slice(0, hIdx + 1); hist.push(s);
+  if (hist.length > HIST_CAP + 1) hist.shift();
+  hIdx = hist.length - 1;
+  updateUndoBtns(); scheduleSave(); scheduleStrip();
+}
+function restore(s) {
+  const o = JSON.parse(s);
+  pages = o.pages; cur = o.cur; galleryIds = o.galleryIds;
+  sel = null; cropMode = false; editing = null;
+  renderAll(); scheduleSave();
+}
+function undo() { if (editing) exitEdit(); if (hIdx > 0) restore(hist[--hIdx]); }
+function redo() { if (editing) exitEdit(); if (hIdx < hist.length - 1) restore(hist[++hIdx]); }
+function updateUndoBtns() { $('undo-btn').disabled = hIdx <= 0; $('redo-btn').disabled = hIdx >= hist.length - 1; }
+
+// ───────── PERSISTENCE (IndexedDB) ─────────
+let dbP = null, saveTimer = null;
+function getDB() {
+  if (!dbP) dbP = new Promise((res, rej) => {
+    const r = indexedDB.open('magazine-builder', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  return dbP;
+}
+function setStatus(t) { $('save-status').textContent = t; }
+function scheduleSave() { clearTimeout(saveTimer); setStatus('Saving…'); saveTimer = setTimeout(saveNow, 600); }
+async function saveNow() {
+  clearTimeout(saveTimer); saveTimer = null;
+  try {
+    const used = new Set(galleryIds);
+    pages.forEach(p => { if (p.bgImg) used.add(p.bgImg); p.els.forEach(e => e.imgId && used.add(e.imgId)); });
+    const imgs = {}; used.forEach(id => { if (images[id]) imgs[id] = images[id]; });
+    const data = { v:2, pages:clone(pages), cur, galleryIds:[...galleryIds], images:imgs, settings:{...settings} };
+    const db = await getDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(data, 'state');
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+    });
+    setStatus('Saved ✓');
+  } catch (err) { console.warn('Autosave failed', err); setStatus('⚠ Not saved'); }
+}
+async function loadState() {
+  const db = await getDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction('kv').objectStore('kv').get('state');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && saveTimer) saveNow(); });
+window.addEventListener('pagehide', () => { if (saveTimer) saveNow(); });
+
+function newMagazine() {
+  if (!confirm('Start a new magazine? This clears all pages and uploaded images.')) return;
+  pages = [newPage()]; cur = 0; galleryIds = []; images = {};
+  sel = null; cropMode = false; editing = null;
+  resetHistory(); renderAll(); saveNow();
+}
+
+// ───────── GALLERY / UPLOAD ─────────
+function handleUpload(e) { addFiles(e.target.files); e.target.value = ''; }
+function readImage(f) {
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const src = ev.target.result, im = new Image();
+      im.onload = () => res({ src, name:f.name, w:im.naturalWidth, h:im.naturalHeight });
+      im.onerror = () => res(null);
+      im.src = src;
+    };
+    reader.onerror = () => res(null);
+    reader.readAsDataURL(f);
+  });
+}
+async function addFiles(files) {
+  const ids = [];
+  for (const f of [...files]) {
+    if (f.type && !f.type.startsWith('image/')) continue;
+    const r = await readImage(f); if (!r) continue;
+    const id = uid('g'); images[id] = r; galleryIds.push(id); ids.push(id);
+  }
+  if (ids.length) { renderGallery(); renderBgControls(); commit(); }
+  return ids;
+}
+const uploadZone = $('upload-zone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('dragover'); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+function renderGallery() {
+  gallery.innerHTML = galleryIds.filter(id => images[id]).map(id => `
+    <div class="gallery-item" data-id="${id}">
+      <img src="${images[id].src}" alt="${esc(images[id].name)}" draggable="false">
+      <button class="remove" data-remove="${id}" aria-label="Remove image">×</button>
+    </div>`).join('');
+}
+function removeGalleryImage(id) {
+  galleryIds = galleryIds.filter(g => g !== id);
+  renderGallery(); renderBgControls(); commit();
+}
+
+// tap = add; hold / sideways drag = drag onto canvas
+let gDrag = null;
+gallery.addEventListener('pointerdown', e => {
+  if (e.target.closest('.remove')) return;
+  const item = e.target.closest('.gallery-item');
+  if (!item || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  gDrag = { id:item.dataset.id, item, x0:e.clientX, y0:e.clientY, pid:e.pointerId, active:false, mouse:e.pointerType === 'mouse', timer:null };
+  if (!gDrag.mouse) gDrag.timer = setTimeout(() => { if (gDrag && !gDrag.active) startGalleryDrag(gDrag.x0, gDrag.y0); }, 250);
+});
+function startGalleryDrag(x, y) {
+  const g = images[gDrag.id]; if (!g) { gDrag = null; return; }
+  gDrag.active = true;
+  try { gDrag.item.setPointerCapture(gDrag.pid); } catch (_) {}
+  gDrag.item.style.touchAction = 'none';
+  ghost.querySelector('img').src = g.src; ghost.style.display = 'block';
+  moveGhost(x, y); closeOverlay();
+}
+function overCanvas(x, y) { const r = canvasContainer.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }
+function moveGhost(x, y) { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; canvasContainer.classList.toggle('drag-over', overCanvas(x, y)); }
+function galleryMove(e) {
+  if (!gDrag || e.pointerId !== gDrag.pid) return false;
+  const dx = e.clientX - gDrag.x0, dy = e.clientY - gDrag.y0, dist = Math.hypot(dx, dy);
+  if (!gDrag.active) {
+    if (gDrag.mouse ? dist > 5 : (dist > 10 && Math.abs(dx) > Math.abs(dy))) { clearTimeout(gDrag.timer); startGalleryDrag(e.clientX, e.clientY); }
+    else if (dist > 10) { clearTimeout(gDrag.timer); gDrag = null; }
+    return true;
+  }
+  e.preventDefault(); moveGhost(e.clientX, e.clientY); return true;
+}
+function galleryUp(e, cancelled) {
+  if (!gDrag || e.pointerId !== gDrag.pid) return;
+  clearTimeout(gDrag.timer);
+  const d = gDrag; gDrag = null;
+  d.item.style.touchAction = ''; ghost.style.display = 'none'; canvasContainer.classList.remove('drag-over');
+  if (cancelled) return;
+  if (!d.active) { addImageToPage(d.id); closeOverlay(); return; }
+  if (overCanvas(e.clientX, e.clientY)) {
+    const r = canvasContainer.getBoundingClientRect();
+    dropGalleryImage(d.id, (e.clientX - r.left) / zoom, (e.clientY - r.top) / zoom);
+  }
+}
+gallery.addEventListener('click', e => { const rm = e.target.closest('.remove'); if (rm) { e.stopPropagation(); removeGalleryImage(rm.dataset.remove); } });
+gallery.addEventListener('contextmenu', e => e.preventDefault());
+
+// ───────── ELEMENTS ─────────
+function imgEl(imgId, x, y, w, h) { return { id:uid('e'), type:'image', imgId, x, y, w, h, rot:0, crop:{ px:50, py:50, s:1 } }; }
+function textEl(kind, over) {
+  const d = TEXT_DEFAULTS[kind];
+  const e = { id:uid('e'), type:'text', kind, ...clone(d), rot:0, ...over };
+  if (e.x === undefined) e.x = (PAGEW - e.w) / 2;
+  if (e.y === undefined) e.y = (PAGEH - e.h) / 2;
+  return e;
+}
+function pushAndSelect(e) { page().els.push(e); sel = e.id; cropMode = false; renderCanvas(); updateToolbar(); updateInfo(); commit(); }
+function addImageToPage(gid) {
+  if (!images[gid]) return;
+  const w = PAGEW * 0.6, h = PAGEH * 0.4;
+  pushAndSelect(imgEl(gid, (PAGEW - w) / 2, (PAGEH - h) / 2, w, h));
+}
+function dropGalleryImage(gid, px, py) {
+  const g = images[gid]; if (!g) return;
+  let w = g.w || 200, h = g.h || 200;
+  if (w > PAGEW * 0.8) { const r = PAGEW * 0.8 / w; w *= r; h *= r; }
+  if (h > PAGEH * 0.6) { const r = PAGEH * 0.6 / h; w *= r; h *= r; }
+  let x = clamp(px - w / 2, 0, PAGEW - w), y = clamp(py - h / 2, 0, PAGEH - h);
+  if (settings.snap) { x = rnd(x); y = rnd(y); }
+  pushAndSelect(imgEl(gid, x, y, w, h));
+}
+function addText(kind) { pushAndSelect(textEl(kind, {})); closeOverlay(); }
+
+// desktop: drop image files directly on the page
+canvasContainer.addEventListener('dragover', e => { e.preventDefault(); canvasContainer.classList.add('drag-over'); });
+canvasContainer.addEventListener('dragleave', () => canvasContainer.classList.remove('drag-over'));
+canvasContainer.addEventListener('drop', async e => {
+  e.preventDefault(); canvasContainer.classList.remove('drag-over');
+  const r = canvasContainer.getBoundingClientRect();
+  const px = (e.clientX - r.left) / zoom, py = (e.clientY - r.top) / zoom;
+  const ids = await addFiles(e.dataTransfer.files || []);
+  ids.forEach(id => dropGalleryImage(id, px, py));
+});
+
+// ───────── SELECTION / EDITING ─────────
+function select(id) {
+  if (id !== sel) cropMode = false;
+  sel = id; decorate(); updateToolbar(); updateInfo();
+}
+function enterEdit(id) {
+  const e = id && findEl(id); if (!e || e.type !== 'text') return;
+  if (sel !== id) select(id);
+  const n = nodeOf(id), t = n.querySelector('.txt');
+  editing = id; n.classList.add('editing');
+  t.setAttribute('contenteditable', 'plaintext-only');
+  if (t.contentEditable !== 'plaintext-only') t.setAttribute('contenteditable', 'true');
+  t.focus();
+  try { const rg = document.createRange(); rg.selectNodeContents(t); rg.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(rg); } catch (_) {}
+  t.oninput = () => { e.text = t.innerText; };
+  t.onblur = () => exitEdit();
+}
+function exitEdit() {
+  if (!editing) return;
+  const id = editing; editing = null;
+  const n = nodeOf(id), e = findEl(id);
+  if (n) {
+    const t = n.querySelector('.txt');
+    if (e) e.text = t.innerText.replace(/\n$/, '');
+    t.removeAttribute('contenteditable'); t.oninput = t.onblur = null;
+    n.classList.remove('editing');
+  }
+  commit(); scheduleStrip();
+}
+
+// ───────── GESTURES ON CANVAS ─────────
+const ptrs = new Map();
+let op = null, lastTap = null;
+
+canvas.addEventListener('pointerdown', ev => {
+  if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+  if (ev.target.closest('.del-btn')) return;
+  const n = ev.target.closest('.el');
+  if (editing && n && n.dataset.id === editing) return; // native caret / selection
+  if (editing) exitEdit();
+  ev.preventDefault();
+  ptrs.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+  if (ptrs.size === 2 && selEl()) { startPinch(); return; }
+  if (ptrs.size > 2) return;
+  if (!n) { select(null); return; }
+  const id = n.dataset.id, wasSel = sel === id;
+  if (!wasSel) select(id);
+  const e = selEl();
+  const base = { id, pid:ev.pointerId, x0:ev.clientX, y0:ev.clientY, orig:clone(e), moved:false, wasSel };
+  const h = ev.target.closest('.handle');
+  if (ev.target.closest('.rot')) { const b = n.getBoundingClientRect(); op = { ...base, type:'rotate', cx:b.left + b.width / 2, cy:b.top + b.height / 2 }; }
+  else if (h) op = { ...base, type:'resize', dir:h.dataset.dir };
+  else if (cropMode && e.type === 'image') op = { ...base, type:'pan' };
+  else op = { ...base, type:'move' };
+});
+canvas.addEventListener('click', ev => { if (ev.target.closest('.del-btn')) { ev.stopPropagation(); deleteSel(); } });
+
+function startPinch() {
+  const [a, b] = [...ptrs.values()], e = selEl();
+  op = { type:'pinch', id:e.id, d0:Math.hypot(b.x - a.x, b.y - a.y) || 1, a0:Math.atan2(b.y - a.y, b.x - a.x), orig:clone(e) };
+}
+function doPinch() {
+  const [a, b] = [...ptrs.values()], e = findEl(op.id); if (!e || !b) return;
+  const o = op.orig, k = Math.hypot(b.x - a.x, b.y - a.y) / op.d0;
+  const da = (Math.atan2(b.y - a.y, b.x - a.x) - op.a0) * 180 / Math.PI;
+  if (cropMode && e.type === 'image') e.crop = { ...o.crop, s:clamp(o.crop.s * k, 1, 5) };
+  else {
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+    e.w = Math.max(30, o.w * k); e.h = Math.max(30, o.h * k);
+    e.x = cx - e.w / 2; e.y = cy - e.h / 2; e.rot = normAng((o.rot || 0) + da);
+    if (e.type === 'text') e.size = clamp(Math.round(o.size * k), 6, 300);
+  }
+  updateNode(e); updateInfo(); syncToolbar();
+}
+
+window.addEventListener('pointermove', ev => {
+  if (galleryMove(ev)) return;
+  if (stripMove(ev)) return;
+  if (!ptrs.has(ev.pointerId)) return;
+  ptrs.set(ev.pointerId, { x:ev.clientX, y:ev.clientY });
+  if (!op) return;
+  ev.preventDefault();
+  if (op.type === 'pinch') { doPinch(); return; }
+  if (ev.pointerId !== op.pid) return;
+  const sdx = ev.clientX - op.x0, sdy = ev.clientY - op.y0;
+  if (!op.moved && Math.hypot(sdx, sdy) < 4) return;
+  op.moved = true;
+  const e = findEl(op.id); if (!e) return;
+  const o = op.orig, dx = sdx / zoom, dy = sdy / zoom;
+  if (op.type === 'move') {
+    let nx = o.x + dx, ny = o.y + dy;
+    nx = clamp(nx, Math.min(0, PAGEW - o.w), Math.max(0, PAGEW - o.w));
+    ny = clamp(ny, Math.min(0, PAGEH - o.h), Math.max(0, PAGEH - o.h));
+    if (settings.snap) { nx = rnd(nx); ny = rnd(ny); }
+    e.x = nx; e.y = ny;
+  } else if (op.type === 'resize') {
+    const a = -(o.rot || 0) * Math.PI / 180;
+    const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
+    let { x, y, w, h } = o; const d = op.dir, m = 30;
+    if (d.includes('e')) w = o.w + lx;
+    if (d.includes('s')) h = o.h + ly;
+    if (d.includes('w')) { w = o.w - lx; x = o.x + lx; }
+    if (d.includes('n')) { h = o.h - ly; y = o.y + ly; }
+    if (settings.snap && !o.rot) {
+      if (d.includes('w')) { x = rnd(x); w = o.x + o.w - x; }
+      if (d.includes('n')) { y = rnd(y); h = o.y + o.h - y; }
+      if (d.includes('e')) w = rnd(o.x + o.w + lx) - x;
+      if (d.includes('s')) h = rnd(o.y + o.h + ly) - y;
+    }
+    if (w < m) { if (d.includes('w')) x = o.x + o.w - m; w = m; }
+    if (h < m) { if (d.includes('n')) y = o.y + o.h - m; h = m; }
+    Object.assign(e, { x, y, w, h });
+  } else if (op.type === 'rotate') {
+    let ang = Math.atan2(ev.clientY - op.cy, ev.clientX - op.cx) * 180 / Math.PI + 90;
+    if (nodeOf(e.id)?.classList.contains('ui-below')) ang -= 180;
+    if (settings.snap) ang = Math.round(ang / 5) * 5;
+    e.rot = normAng(ang);
+  } else if (op.type === 'pan') {
+    const c = o.crop;
+    e.crop = { ...c, px:clamp(c.px - dx / o.w * 100, 0, 100), py:clamp(c.py - dy / o.h * 100, 0, 100) };
+  }
+  updateNode(e); updateInfo(); if (op.type === 'rotate') syncToolbar();
+}, { passive:false });
+
+function pointerEnd(ev) {
+  galleryUp(ev, ev.type === 'pointercancel');
+  stripUp(ev, ev.type === 'pointercancel');
+  if (!ptrs.has(ev.pointerId)) return;
+  ptrs.delete(ev.pointerId);
+  if (!op) return;
+  if (op.type === 'pinch') { if (ptrs.size < 2) { op = null; decorate(); commit(); } return; }
+  if (ev.pointerId !== op.pid) return;
+  const o = op; op = null;
+  if (o.moved) { decorate(); commit(); return; }
+  if (ev.type === 'pointercancel') return;
+  const now = Date.now(), e = findEl(o.id); if (!e) return;
+  const dbl = lastTap && lastTap.id === o.id && now - lastTap.t < 350;
+  lastTap = dbl ? null : { id:o.id, t:now };
+  if (e.type === 'text') { if (o.wasSel || dbl) enterEdit(e.id); }
+  else if (dbl) toggleCrop();
+}
+window.addEventListener('pointerup', pointerEnd);
+window.addEventListener('pointercancel', pointerEnd);
+document.addEventListener('touchmove', e => { if ((gDrag && gDrag.active) || (sDrag && sDrag.active) || op) e.preventDefault(); }, { passive:false });
+canvasWrapper.addEventListener('pointerdown', e => {
+  if (e.target === canvasWrapper) { if (editing) exitEdit(); select(null); }
+  closeOverlay();
+});
+
+// ───────── ELEMENT ACTIONS ─────────
+function deleteSel() {
+  if (!sel) return;
+  page().els = page().els.filter(e => e.id !== sel);
+  sel = null; cropMode = false; editing = null;
+  renderCanvas(); updateToolbar(); updateInfo(); commit();
+}
+function nudge(dx, dy) {
+  const e = selEl(); if (!e) return;
+  const step = settings.snap ? GRID : 1;
+  e.x = clamp(e.x + dx * step, Math.min(0, PAGEW - e.w), Math.max(0, PAGEW - e.w));
+  e.y = clamp(e.y + dy * step, Math.min(0, PAGEH - e.h), Math.max(0, PAGEH - e.h));
+  updateNode(e); decorate(); updateInfo(); commit();
+}
+function reorder(toFront) {
+  const els = page().els, i = els.findIndex(e => e.id === sel); if (i < 0) return;
+  const [e] = els.splice(i, 1);
+  toFront ? els.push(e) : els.unshift(e);
+  renderCanvas(); commit();
+}
+function bringToFront() { reorder(true); }
+function sendToBack() { reorder(false); }
+function duplicateEl() {
+  const e = selEl(); if (!e) return;
+  const c = clone(e); c.id = uid('e'); c.x += 20; c.y += 20;
+  pushAndSelect(c);
+}
+function toggleCrop() {
+  const e = selEl(); if (!e || e.type !== 'image') return;
+  if (!e.crop) e.crop = { px:50, py:50, s:1 };
+  cropMode = !cropMode; decorate(); updateToolbar(); updateInfo();
+}
+function resetCrop() { const e = selEl(); if (!e) return; e.crop = { px:50, py:50, s:1 }; updateNode(e); syncToolbar(); commit(); }
+function toggleProp(p) { const e = selEl(); if (!e || e.type !== 'text') return; e[p] = !e[p]; updateNode(e); syncToolbar(); commit(); }
+function setAlign(a) { const e = selEl(); if (!e || e.type !== 'text') return; e.align = a; updateNode(e); syncToolbar(); commit(); }
+
+// toolbar inputs: live on 'input', history on 'change'
+function bindInput(id, apply) {
+  const inp = $(id);
+  inp.addEventListener('input', () => { const e = selEl(); if (!e) return; apply(e, inp); updateNode(e); updateInfo(); syncToolbar(); });
+  inp.addEventListener('change', () => { const e = selEl(); if (!e) return; apply(e, inp); updateNode(e); syncToolbar(); commit(); });
+}
+bindInput('tb-rot', (e, i) => { e.rot = +i.value; });
+bindInput('tb-cropzoom', (e, i) => { if (e.type === 'image') e.crop = { ...(e.crop || { px:50, py:50 }), s:i.value / 100 }; });
+bindInput('tb-font', (e, i) => { if (e.type === 'text') e.font = i.value; });
+bindInput('tb-size', (e, i) => { if (e.type === 'text' && +i.value > 0) e.size = clamp(+i.value, 6, 300); });
+bindInput('tb-color', (e, i) => { if (e.type === 'text') e.color = i.value; });
+bindInput('tb-bgon', (e, i) => { if (e.type === 'text') e.bg = i.checked ? $('tb-bg').value : null; });
+bindInput('tb-bg', (e, i) => { if (e.type === 'text') { e.bg = i.value; $('tb-bgon').checked = true; } });
+
+function updateToolbar() {
+  const e = selEl();
+  tb.classList.toggle('show', !!e);
+  if (!e) return;
+  tb.classList.toggle('is-text', e.type === 'text');
+  tb.classList.toggle('is-img', e.type === 'image');
+  tb.classList.toggle('cropping', cropMode);
+  syncToolbar();
+}
+function syncToolbar() {
+  const e = selEl(); if (!e) return;
+  $('tb-rot').value = Math.round(e.rot || 0); $('tb-rot-val').textContent = Math.round(e.rot || 0) + '°';
+  $('tb-crop').classList.toggle('on', cropMode);
+  $('tb-crop').textContent = cropMode ? '✓ Done' : '✂ Crop';
+  if (e.type === 'image') $('tb-cropzoom').value = Math.round((e.crop?.s || 1) * 100);
+  if (e.type === 'text') {
+    $('tb-font').value = e.font; $('tb-size').value = e.size; $('tb-color').value = e.color;
+    $('tb-bgon').checked = !!e.bg; if (e.bg) $('tb-bg').value = e.bg;
+    $('tb-bold').classList.toggle('on', !!e.bold); $('tb-italic').classList.toggle('on', !!e.italic);
+    tb.querySelectorAll('[data-align]').forEach(b => b.classList.toggle('on', b.dataset.align === e.align));
+  }
+}
+$('tb-font').innerHTML = Object.entries(FONTS).map(([k, f]) => `<option value="${k}" style="font-family:${f.css.replace(/"/g, "'")}">${f.label}</option>`).join('');
+
+function updateInfo() {
+  const e = selEl();
+  if (!e) { infoBar.textContent = 'No element selected'; return; }
+  let t = `Pos (${Math.round(e.x)}, ${Math.round(e.y)}) · ${Math.round(e.w)}×${Math.round(e.h)} · ${Math.round(e.rot || 0)}°`;
+  if (cropMode) t += ' · Crop: drag to pan, pinch/slider to zoom';
+  else if (e.type === 'text') t += ' · Tap again to edit';
+  else t += ' · Double-tap to crop · Pinch to resize/rotate';
+  infoBar.textContent = t;
+}
+
+// ───────── PAGES ─────────
+function updatePageIndicator() { $('page-indicator').textContent = `Page ${cur + 1} / ${pages.length}`; }
+function goToPage(i) {
+  if (editing) exitEdit();
+  if (i < 0 || i >= pages.length) return;
+  cur = i; sel = null; cropMode = false; renderAll(); scheduleSave();
+}
+function prevPage() { goToPage(cur - 1); }
+function nextPage() { goToPage(cur + 1); }
+function addPage() { pages.splice(cur + 1, 0, newPage()); cur++; sel = null; renderAll(); commit(); }
+function duplicatePage() {
+  const c = clone(page()); c.els.forEach(e => e.id = uid('e'));
+  pages.splice(cur + 1, 0, c); cur++; sel = null; renderAll(); commit();
+}
+function deletePage() {
+  if (pages.length <= 1) return;
+  pages.splice(cur, 1); if (cur >= pages.length) cur = pages.length - 1;
+  sel = null; renderAll(); commit();
+}
+function clearPage() { page().els = []; sel = null; renderAll(); commit(); }
+
+// ───────── BACKGROUNDS ─────────
+function renderBgControls() {
+  const p = page();
+  $('bg-swatches').innerHTML = BG_PRESETS.map(c => `<div class="swatch${p.bg === c ? ' on' : ''}" data-color="${c}" style="background:${c}" role="button" aria-label="Background ${c}"></div>`).join('') +
+    `<input type="color" id="bg-color" value="${/^#[0-9a-f]{6}$/i.test(p.bg) ? p.bg : '#ffffff'}" aria-label="Custom background color">`;
+  $('bg-picker').innerHTML = `<div class="bgopt${!p.bgImg ? ' on' : ''}" data-bgimg="">No image</div>` +
+    galleryIds.filter(id => images[id]).map(id => `<div class="bgopt${p.bgImg === id ? ' on' : ''}" data-bgimg="${id}"><img src="${images[id].src}" alt=""></div>`).join('');
+  const ci = $('bg-color');
+  ci.addEventListener('input', () => { page().bg = ci.value; canvas.style.background = ci.value; });
+  ci.addEventListener('change', () => { setBg(ci.value); });
+}
+function setBg(c) { page().bg = c; canvas.style.background = c; renderBgControls(); commit(); }
+$('bg-swatches').addEventListener('click', e => { const s = e.target.closest('.swatch'); if (s) setBg(s.dataset.color); });
+$('bg-picker').addEventListener('click', e => {
+  const o = e.target.closest('.bgopt'); if (!o) return;
+  page().bgImg = o.dataset.bgimg || null; renderCanvas(); renderBgControls(); commit();
+});
+
+// ───────── TEMPLATES ─────────
+const TEMPLATES = [
+  { name:'Cover', cover:true, rects:[{x:0,y:0,w:1,h:1}], texts:[{x:.05,y:.03,w:.9,h:.12},{x:.05,y:.66,w:.4,h:.05},{x:.05,y:.8,w:.35,h:.04}] },
+  { name:'Full', rects:[{x:0,y:0,w:1,h:1}] },
+  { name:'Hero', rects:[{x:0,y:0,w:1,h:0.55},{x:0,y:0.55,w:0.48,h:0.45},{x:0.52,y:0.55,w:0.48,h:0.45}] },
+  { name:'Split', rects:[{x:0,y:0,w:0.5,h:1},{x:0.5,y:0,w:0.5,h:1}] },
+  { name:'3 Col', rects:[{x:0,y:0,w:0.33,h:1},{x:0.33,y:0,w:0.34,h:1},{x:0.67,y:0,w:0.33,h:1}] },
+  { name:'L Bar', rects:[{x:0,y:0,w:0.58,h:0.58},{x:0,y:0.58,w:0.58,h:0.42},{x:0.58,y:0,w:0.42,h:1}] },
+  { name:'4 Grid', rects:[{x:0,y:0,w:0.5,h:0.5},{x:0.5,y:0,w:0.5,h:0.5},{x:0,y:0.5,w:0.5,h:0.5},{x:0.5,y:0.5,w:0.5,h:0.5}] },
+];
+function buildTemplates() {
+  templatesEl.innerHTML = TEMPLATES.map((t, i) => {
+    const pct = r => `left:${r.x*100}%;top:${r.y*100}%;width:${r.w*100}%;height:${r.h*100}%`;
+    const lines = t.rects.map(r => `<div class="t-line" style="${pct(r)}"></div>`).join('') + (t.texts || []).map(r => `<div class="t-text" style="${pct(r)}"></div>`).join('');
+    return `<div class="template" role="button" onclick="applyTemplate(${i})" title="${t.name}">${lines}<span class="template-name">${t.name}</span></div>`;
+  }).join('');
+}
+function applyTemplate(i) {
+  const t = TEMPLATES[i], gids = galleryIds.filter(id => images[id]);
+  if (t.cover) { applyCover(gids); closeOverlay(); return; }
+  if (!gids.length) { alert('Upload images first from the sidebar.'); return; }
+  const m = 8;
+  page().els = t.rects.map((r, k) => imgEl(gids[k % gids.length], r.x * PAGEW + m, r.y * PAGEH + m, r.w * PAGEW - m * 2, r.h * PAGEH - m * 2));
+  sel = null; renderAll(); commit(); closeOverlay();
+}
+function applyCover(gids) {
+  const p = page(), els = [];
+  if (gids.length) els.push(imgEl(gids[0], 0, 0, PAGEW, PAGEH)); else p.bg = '#16213e';
+  els.push(textEl('headline', { text:'MAGAZINE', x:20, y:22, w:555, h:130, font:'display', size:88, bold:true, align:'center', color:'#ffffff' }));
+  els.push(textEl('caption', { text:'ISSUE 01 · FALL 2026', x:20, y:150, w:555, h:28, font:'sans', size:14, bold:true, italic:false, align:'center', color:'#ffffff' }));
+  els.push(textEl('body', { text:'THE BIG STORY\nHow it all began', x:30, y:540, w:280, h:90, font:'condensed', size:28, bold:true, color:'#ffffff' }));
+  els.push(textEl('body', { text:'10 ideas for\nthe weekend', x:30, y:660, w:240, h:70, font:'condensed', size:22, bold:false, color:'#ffffff' }));
+  els.push(textEl('body', { text:'Inside: the people,\nthe places, the plans', x:330, y:740, w:235, h:60, font:'serif', size:16, italic:true, align:'right', color:'#ffffff' }));
+  p.els = els; sel = null; renderAll(); commit();
+}
+
+// ───────── PAGE STRIP (live thumbs, tap to jump, drag to reorder) ─────────
+let stripTimer = null;
+function scheduleStrip() { clearTimeout(stripTimer); stripTimer = setTimeout(renderStrip, 250); }
+function renderStrip() {
+  clearTimeout(stripTimer);
+  if (sDrag && sDrag.active) return;
+  stripPages.innerHTML = pages.map((p, i) =>
+    `<div class="thumb${i === cur ? ' active' : ''}" data-i="${i}" role="button" aria-label="Page ${i + 1}"><div class="thumb-scale">${pageHTML(p)}</div><span class="num">${i + 1}</span></div>`).join('');
+  const a = stripPages.querySelector('.thumb.active'); if (a && a.scrollIntoView) a.scrollIntoView({ block:'nearest', inline:'nearest' });
+}
+let sDrag = null;
+stripPages.addEventListener('pointerdown', ev => {
+  const t = ev.target.closest('.thumb'); if (!t || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+  sDrag = { i:+t.dataset.i, t, x0:ev.clientX, y0:ev.clientY, pid:ev.pointerId, active:false, mouse:ev.pointerType === 'mouse', to:+t.dataset.i };
+  if (!sDrag.mouse) sDrag.timer = setTimeout(() => { if (sDrag && !sDrag.active) startStripDrag(); }, 250);
+});
+stripPages.addEventListener('contextmenu', e => e.preventDefault());
+function startStripDrag() {
+  sDrag.active = true; sDrag.t.classList.add('dragging'); sDrag.t.style.touchAction = 'none';
+  try { sDrag.t.setPointerCapture(sDrag.pid); } catch (_) {}
+  sDrag.centers = [...stripPages.querySelectorAll('.thumb')].map(n => { const r = n.getBoundingClientRect(); return r.left + r.width / 2; });
+}
+function stripMove(ev) {
+  if (!sDrag || ev.pointerId !== sDrag.pid) return false;
+  const dx = ev.clientX - sDrag.x0, dy = ev.clientY - sDrag.y0, dist = Math.hypot(dx, dy);
+  if (!sDrag.active) {
+    if (sDrag.mouse && dist > 5) startStripDrag();
+    else if (!sDrag.mouse && dist > 10) { clearTimeout(sDrag.timer); sDrag = null; }
+    return true;
+  }
+  ev.preventDefault();
+  sDrag.t.style.transform = `translateX(${dx}px)`;
+  let to = 0; sDrag.centers.forEach((c, k) => { if (k !== sDrag.i && c < ev.clientX) to++; });
+  sDrag.to = to;
+  return true;
+}
+function stripUp(ev, cancelled) {
+  if (!sDrag || ev.pointerId !== sDrag.pid) return;
+  clearTimeout(sDrag.timer);
+  const d = sDrag; sDrag = null;
+  if (!d.active) { if (!cancelled) goToPage(d.i); return; }
+  d.t.style.transform = ''; d.t.classList.remove('dragging');
+  if (cancelled || d.to === d.i) { renderStrip(); return; }
+  const curObj = pages[cur], [moved] = pages.splice(d.i, 1);
+  pages.splice(d.to, 0, moved);
+  cur = pages.indexOf(curObj); sel = null;
+  renderAll(); commit();
+}
+
+// ───────── EXPORT (in-page print, no popups) ─────────
+function renderPrintPages(list) {
+  printRoot.innerHTML = list.map(p => `<div class="print-page">${pageHTML(p)}</div>`).join('');
+  const imgs = [...printRoot.querySelectorAll('img')];
+  return Promise.all(imgs.map(i => i.complete ? null : new Promise(r => { i.onload = i.onerror = r; })));
+}
+function doPrint(list) { if (editing) exitEdit(); renderPrintPages(list).then(() => setTimeout(() => window.print(), 50)); }
+function exportPage() { doPrint([page()]); }
+function exportAll() { doPrint(pages); }
+window.addEventListener('afterprint', () => { printRoot.innerHTML = ''; });
+
+// ───────── KEYBOARD ─────────
+function isTyping() { const a = document.activeElement; return a && (a.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }
+document.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && !isTyping()) {
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); return; }
+  }
+  if (isTyping()) { if (e.key === 'Escape' && editing) document.activeElement.blur(); return; }
+  if (!sel) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-1, 0); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(1, 0); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); nudge(0, -1); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); nudge(0, 1); }
+  else if (e.key === 'Escape') { if (cropMode) toggleCrop(); else select(null); }
+});
+
+
+// ───────── GOOGLE PHOTOS PICKER API ─────────
+// Flow: GIS token → sessions.create → open pickerUri (+/autoclose) → poll sessions.get
+// until mediaItemsSet → mediaItems.list → fetch baseUrl=w2048-h2048 with bearer → gallery → sessions.delete
+const GP_SCOPE = 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly';
+const GP_API = 'https://photospicker.googleapis.com/v1';
+const GP = { token:null, tokenExp:0, client:null, gisP:null, session:null, cancelled:false, pollTimer:null, win:null };
+
+function gpInitButton() {
+  const btn = $('gp-btn'), note = $('gp-note');
+  if (!GOOGLE_CLIENT_ID) { btn.disabled = true; note.textContent = 'Google Photos is not set up yet: add an OAuth client ID (GOOGLE_CLIENT_ID) to enable it.'; return; }
+  if (location.protocol !== 'https:' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    note.textContent = 'Google sign-in needs this page to be opened from its https address.';
+  }
+  gpLoadGIS().catch(() => {});
+}
+function gpLoadGIS() {
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  if (!GP.gisP) GP.gisP = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = () => res(); sc.onerror = () => { GP.gisP = null; rej(new Error('gis')); };
+    document.head.appendChild(sc);
+  });
+  return GP.gisP;
+}
+// ── panel UI ──
+function gpShow(title, msg, actions, opts = {}) {
+  $('gp-panel').classList.add('show');
+  $('gp-title').textContent = title;
+  const m = $('gp-msg'); m.textContent = msg; m.classList.toggle('err', !!opts.error);
+  $('gp-bar').style.display = opts.progress == null ? 'none' : 'block';
+  if (opts.progress != null) $('gp-bar').firstElementChild.style.width = Math.round(opts.progress * 100) + '%';
+  const a = $('gp-actions'); a.innerHTML = '';
+  (actions || []).forEach(x => {
+    const el = document.createElement(x.href ? 'a' : 'button');
+    el.textContent = x.label; el.className = x.primary ? 'gp-primary' : 'gp-secondary';
+    if (x.href) { el.href = x.href; el.target = '_blank'; el.rel = 'noopener'; }
+    if (x.onClick) el.addEventListener('click', x.onClick);
+    if (x.id) el.id = x.id;
+    a.appendChild(el);
+  });
+}
+function gpHide() { $('gp-panel').classList.remove('show'); }
+const gpCancelBtn = { label:'Cancel', onClick:() => gpCancel() };
+function gpError(msg) { gpShow('Google Photos', msg, [{ label:'Close', primary:true, onClick:() => gpCancel() }], { error:true }); }
+
+// ── auth ──
+function gpHasToken() { return GP.token && Date.now() < GP.tokenExp - 60000; }
+async function googlePhotosStart() {
+  if (!GOOGLE_CLIENT_ID) return;
+  GP.cancelled = false;
+  closeOverlay();
+  if (gpHasToken()) { gpCreateSession(); return; }
+  const gisReady = !!(window.google && google.accounts && google.accounts.oauth2);
+  gpShow('Google Photos', 'Connecting to Google…', [gpCancelBtn]);
+  try { await gpLoadGIS(); }
+  catch (_) { gpError("Couldn't load Google sign-in. Check your internet connection (or content blockers) and try again."); return; }
+  if (!GP.client) {
+    GP.client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID, scope: GP_SCOPE,
+      callback: r => gpOnToken(r),
+      error_callback: e => {
+        if (e && e.type === 'popup_closed') gpError('Sign-in was closed before it finished. Tap Google Photos to try again.');
+        else if (e && e.type === 'popup_failed_to_open') gpError('Safari blocked the Google sign-in window. Allow pop-ups for this site (Settings → Safari → Block Pop-ups) and try again.');
+        else gpError('Google sign-in failed. Please try again.');
+      },
+    });
+  }
+  // The sign-in popup must open from a user tap. If GIS was already loaded we are still inside the tap;
+  // otherwise ask for one more tap.
+  if (gisReady) GP.client.requestAccessToken();
+  else gpShow('Google Photos', 'Sign in with Google to choose photos.', [gpCancelBtn, { label:'Sign in with Google', primary:true, onClick:() => GP.client.requestAccessToken() }]);
+}
+function gpOnToken(r) {
+  if (!r || r.error || !r.access_token) {
+    gpError(r && r.error === 'access_denied' ? 'Access was not granted, so no photos can be imported.' : 'Google sign-in failed (' + ((r && (r.error_description || r.error)) || 'unknown error') + ').');
+    return;
+  }
+  if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(r, GP_SCOPE)) {
+    gpError('Please allow access to the photos you pick (Google Photos permission) and try again.'); return;
+  }
+  GP.token = r.access_token; GP.tokenExp = Date.now() + (+r.expires_in || 3600) * 1000;
+  gpCreateSession();
+}
+// ── REST helper with friendly errors ──
+async function gpFetch(url, opts = {}) {
+  let res;
+  try { res = await fetch(url, { ...opts, headers:{ ...(opts.headers || {}), Authorization:'Bearer ' + GP.token } }); }
+  catch (_) { throw new Error('Network problem talking to Google Photos. Check your connection and try again.'); }
+  if (res.ok) return res;
+  let detail = ''; try { const j = await res.json(); detail = (j.error && (j.error.status || j.error.message)) || ''; } catch (_) {}
+  if (res.status === 401) { GP.token = null; throw new Error('Your Google sign-in expired. Tap Google Photos to sign in again.'); }
+  if (res.status === 403) throw new Error('Google refused access. The Photos Picker API may not be enabled for this app, or permission was not granted.' + (detail ? '\n(' + detail + ')' : ''));
+  if (res.status === 429) throw new Error('Too many requests to Google Photos right now. Wait a minute and try again.');
+  const e = new Error('Google Photos error ' + res.status + (detail ? ': ' + detail : '')); e.status = res.status; throw e;
+}
+const gpDur = s => { const n = parseFloat(String(s || '').replace('s', '')); return isFinite(n) ? n * 1000 : null; };
+
+// ── session ──
+async function gpCreateSession() {
+  gpShow('Google Photos', 'Preparing the photo picker…', [gpCancelBtn]);
+  try {
+    const r = await gpFetch(GP_API + '/sessions', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' });
+    GP.session = await r.json();
+  } catch (e) { gpError(e.message); return; }
+  if (GP.cancelled) { gpDeleteSession(); return; }
+  const uri = GP.session.pickerUri.replace(/\/$/, '') + '/autoclose';
+  gpShow('Choose photos',
+    'Tap "Open Google Photos", pick your photos, then tap Done. This window will import them automatically.',
+    [gpCancelBtn, { label:'Open Google Photos', primary:true, href:uri, id:'gp-open',
+      onClick: ev => {
+        // open from the tap itself so iPad Safari allows it
+        const w = window.open(uri, '_blank');
+        if (w) { ev.preventDefault(); GP.win = w; }
+        setTimeout(() => gpWaiting(uri), 0);
+      } }]);
+  gpPoll();
+}
+function gpWaiting(uri) {
+  gpShow('Waiting for your selection…', 'Pick photos in the Google Photos tab and tap Done, then come back here.',
+    [gpCancelBtn, { label:'Open again', href:uri, onClick: ev => { const w = window.open(uri, '_blank'); if (w) ev.preventDefault(); } }], { progress:0 });
+}
+async function gpPoll() {
+  clearTimeout(GP.pollTimer);
+  if (GP.cancelled || !GP.session) return;
+  const started = GP.pollStart || (GP.pollStart = Date.now());
+  let s;
+  try { s = await (await gpFetch(GP_API + '/sessions/' + encodeURIComponent(GP.session.id))).json(); }
+  catch (e) { gpError(e.message); gpDeleteSession(); return; }
+  if (GP.cancelled) return;
+  if (s.mediaItemsSet) { GP.pollStart = 0; gpImport(); return; }
+  const pc = s.pollingConfig || {}, timeout = gpDur(pc.timeoutIn);
+  if (timeout === 0 || Date.now() - started > 30 * 60000) {
+    GP.pollStart = 0; gpError('The Google Photos session timed out before any photos were picked. Tap Google Photos to try again.'); gpDeleteSession(); return;
+  }
+  GP.pollTimer = setTimeout(gpPoll, clamp(gpDur(pc.pollInterval) || 3000, 500, 15000));
+}
+async function gpListItems() {
+  const items = []; let pageToken = '';
+  do {
+    const u = GP_API + '/mediaItems?pageSize=100&sessionId=' + encodeURIComponent(GP.session.id) + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const j = await (await gpFetch(u)).json();
+    items.push(...(j.mediaItems || [])); pageToken = j.nextPageToken || '';
+  } while (pageToken && !GP.cancelled);
+  return items;
+}
+function blobToDataURL(b) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); }); }
+function imgSize(src) { return new Promise(res => { const i = new Image(); i.onload = () => res({ w:i.naturalWidth, h:i.naturalHeight }); i.onerror = () => res(null); i.src = src; }); }
+async function gpImport() {
+  if (GP.win && !GP.win.closed) { try { GP.win.close(); } catch (_) {} }
+  gpShow('Importing photos…', 'Getting your selection…', [gpCancelBtn], { progress:0 });
+  let items;
+  try { items = await gpListItems(); } catch (e) { gpError(e.message); gpDeleteSession(); return; }
+  const photos = items.filter(it => (it.type ? it.type === 'PHOTO' : true) && it.mediaFile && it.mediaFile.baseUrl &&
+    (!it.mediaFile.mimeType || it.mediaFile.mimeType.startsWith('image/')));
+  const skipped = items.length - photos.length;
+  let ok = 0, failed = 0;
+  for (let k = 0; k < photos.length && !GP.cancelled; k++) {
+    const mf = photos[k].mediaFile;
+    gpShow('Importing photos…', `Downloading ${k + 1} of ${photos.length}…`, [gpCancelBtn], { progress:k / photos.length });
+    try {
+      const blob = await (await gpFetch(mf.baseUrl + '=w2048-h2048')).blob();
+      const src = await blobToDataURL(blob), dim = await imgSize(src);
+      if (!dim) throw new Error('decode');
+      const id = uid('g'); images[id] = { src, name:mf.filename || 'Google Photo', w:dim.w, h:dim.h }; galleryIds.push(id); ok++;
+      renderGallery(); renderBgControls();
+    } catch (e) { failed++; console.warn('Google Photos item failed', e); if (/expired/.test(e.message)) break; }
+  }
+  if (ok) commit();          // history + autosave
+  await gpDeleteSession();
+  if (GP.cancelled) return;
+  const parts = [`Added ${ok} photo${ok === 1 ? '' : 's'} to Your Images.`];
+  if (skipped) parts.push(`${skipped} video${skipped === 1 ? ' was' : 's were'} skipped (only photos are supported).`);
+  if (failed) parts.push(`${failed} couldn't be downloaded.`);
+  if (!ok && !skipped && !failed) parts[0] = 'No photos were selected.';
+  gpShow('Google Photos', parts.join('\n'), [{ label:'Done', primary:true, onClick:gpHide }], { error:!ok && (failed > 0) });
+  if (ok) { if (sidebarIsOverlay()) toggleSidebar(true); }
+}
+async function gpDeleteSession() {
+  const s = GP.session; GP.session = null; clearTimeout(GP.pollTimer);
+  if (!s || !GP.token) return;
+  try { await fetch(GP_API + '/sessions/' + encodeURIComponent(s.id), { method:'DELETE', headers:{ Authorization:'Bearer ' + GP.token } }); } catch (_) {}
+}
+function gpCancel() { GP.cancelled = true; GP.pollStart = 0; gpHide(); gpDeleteSession(); }
+// re-check right away when the user returns from the Google Photos tab
+document.addEventListener('visibilitychange', () => { if (!document.hidden && GP.session && !GP.cancelled) gpPoll(); });
+
+// ───────── INIT ─────────
+function normalize() {
+  pages.forEach(p => {
+    if (!p.bg) p.bg = '#ffffff'; if (p.bgImg === undefined) p.bgImg = null; if (!p.els) p.els = [];
+    p.els.forEach(e => { if (!e.id) e.id = uid('e'); if (e.rot === undefined) e.rot = 0; if (e.type === 'image' && !e.crop) e.crop = { px:50, py:50, s:1 }; });
+  });
+}
+(async function init() {
+  buildTemplates(); gpInitButton();
+  try {
+    const s = await loadState();
+    if (s && Array.isArray(s.pages) && s.pages.length) {
+      pages = s.pages; cur = clamp(s.cur || 0, 0, s.pages.length - 1);
+      galleryIds = s.galleryIds || []; images = s.images || {};
+      settings = { ...settings, ...(s.settings || {}) };
+      setStatus('Restored ✓');
+    }
+  } catch (err) { console.warn('Could not restore', err); }
+  normalize();
+  $('grid-toggle').checked = settings.grid; $('snap-toggle').checked = settings.snap;
+  resetHistory(); renderAll();
+  requestAnimationFrame(fitZoom);
+  window.__ready = true;
+})();
+let fitTimer;
+window.addEventListener('orientationchange', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitZoom, 300); });
+</script>
+</body>
+</html>
